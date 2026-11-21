@@ -27,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: gamified-github-course-design/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
