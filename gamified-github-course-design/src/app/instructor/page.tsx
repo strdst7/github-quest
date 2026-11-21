@@ -22,8 +22,6 @@ import {
   totalMinutes,
 } from "@/lib/course";
 
-export const dynamic = "force-dynamic";
-
 const failurePoints = [
   {
     moment: "email verification code never arrives (level 01)",

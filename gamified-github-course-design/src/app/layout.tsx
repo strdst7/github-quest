@@ -4,23 +4,14 @@ import "./globals.css";
 import { GameProvider } from "@/components/GameProvider";
 import { PaletteProvider, paletteBootstrapScript } from "@/components/PaletteProvider";
 import { Footer, SideRail, TopBar } from "@/components/Nav";
-import { readPlayer } from "@/lib/session";
-import { getLeaderboard, getSnapshot, getWorldStats } from "@/lib/store";
 import { branding, course } from "@/lib/course";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: `gitquest · ${branding.school} · GitHub 101 for absolute beginners`,
   description: course.promise,
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const player = await readPlayer();
-  const initial = player
-    ? await Promise.all([getSnapshot(player.id), getWorldStats(), getLeaderboard()])
-    : null;
-
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -36,11 +27,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <div className="crt-world" aria-hidden />
         <div className="crt-grid" aria-hidden />
         <PaletteProvider>
-        <GameProvider
-          initialSnapshot={initial ? initial[0] : null}
-          initialWorld={initial ? initial[1] : null}
-          initialLeaderboard={initial ? initial[2] : null}
-        >
+        <GameProvider>
           <div className="flex min-h-screen">
             <SideRail />
             <div className="flex min-w-0 flex-1 flex-col">

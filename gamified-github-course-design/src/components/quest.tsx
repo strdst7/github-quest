@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGame } from "@/components/GameProvider";
 import { ACCENTS, Bar, Checkbox, Panel, Pill, type Accent } from "@/components/ui";
 import { activityKey, conceptKey, moduleStats } from "@/lib/game";
@@ -281,7 +281,7 @@ export function MissionBoard({ module, accent }: { module: Module; accent: Accen
 
         {busy ? (
           <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-dim">
-            writing to db<span className="caret" />
+            saving locally<span className="caret" />
           </p>
         ) : null}
       </div>
@@ -427,6 +427,12 @@ export function PlayerCard() {
   const [guild, setGuild] = useState(snapshot.learner.guild ?? "");
   const [confirmReset, setConfirmReset] = useState(false);
 
+  useEffect(() => {
+    setName(snapshot.learner.name);
+    setHandle(snapshot.learner.githubHandle ?? "");
+    setGuild(snapshot.learner.guild ?? "");
+  }, [snapshot.learner.name, snapshot.learner.githubHandle, snapshot.learner.guild]);
+
   const field =
     "mt-1 w-full rounded-[3px] border border-phos/25 bg-screen2 px-3 py-2.5 font-mono text-[13px] text-body outline-none placeholder:text-dim focus:border-phos focus:shadow-[0_0_18px_var(--p-glow)]";
 
@@ -434,7 +440,7 @@ export function PlayerCard() {
     <Panel title={<span><span className="text-cyan">$</span> whoami <span className="text-dim">--edit</span></span>}>
       <div className="p-4">
         <p className="font-mono text-[12px] leading-relaxed text-dim">
-          # your traveller record lives in postgres. stamps follow you between sessions.
+          # your traveller record lives in this browser. stamps follow you between sessions.
         </p>
 
         <div className="mt-4 grid gap-3">

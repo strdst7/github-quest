@@ -17,7 +17,7 @@ export default function LearnPage() {
         <SectionTitle
           kicker="quest-map"
           title={<>$ ./map <span className="text-phos glow-phos">--status</span></>}
-          sub="Tick things off as you do them. Progress is written straight to your traveller record, so you can kill the session mid-mission and resume exactly where you left off."
+          sub="Tick things off as you do them. Progress is saved in this browser, so you can kill the session mid-mission and resume exactly where you left off."
           accent="lime"
         />
 
@@ -179,7 +179,7 @@ export default function LearnPage() {
         <Panel title={<span><span className="text-cyan">$</span> cat /proc/octoverse</span>} accent="aqua">
           <div className="p-4">
             <p className="font-mono text-[12px] text-dim">
-              # live numbers from every traveller on this instance
+              # numbers from your traveller record on this device
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Stat value={world.players} label="travellers" emoji="◉" accent="violet" />

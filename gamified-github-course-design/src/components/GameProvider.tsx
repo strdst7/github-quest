@@ -11,31 +11,22 @@ import {
   type ReactNode,
 } from "react";
 import type { LeaderRow, Snapshot, WorldStats } from "@/lib/types";
-import { badgeCatalog, branding } from "@/lib/course";
-import { levelFor } from "@/lib/game";
-
-const EMPTY_WORLD: WorldStats = { players: 0, stepsCompleted: 0, badgesAwarded: 0, xpBanked: 0, totalSteps: 0 };
-
-const EMPTY_SNAPSHOT: Snapshot = {
-  learner: {
-    id: "",
-    name: branding.learner,
-    githubHandle: branding.handle,
-    guild: branding.school,
-    xp: 0,
-    phoenixFeathers: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  completed: [],
-  badges: [],
-  xp: 0,
-  level: levelFor(0),
-  modules: [],
-  quizzes: {},
-  finalProject: null,
-  coursePercent: 0,
-};
+import { badgeCatalog } from "@/lib/course";
+import {
+  buildLeaderboard,
+  buildSnapshot,
+  buildWorld,
+  createEmptyState,
+  loadState,
+  resetProgress,
+  saveProject,
+  saveState,
+  submitQuiz,
+  toggleStep,
+  updateProfile,
+  type LocalState,
+  type QuizResult,
+} from "@/lib/local-store";
 
 type Toast = {
   id: number;
@@ -44,8 +35,6 @@ type Toast = {
   body?: string;
   tone: "xp" | "badge" | "info" | "level";
 };
-
-type QuizResult = { id: string; correct: boolean; correctAnswer: number; why: string };
 
 type Ctx = {
   snapshot: Snapshot;
@@ -76,25 +65,20 @@ export function useGame() {
   return ctx;
 }
 
-export function GameProvider({
-  children,
-  initialSnapshot,
-  initialWorld,
-  initialLeaderboard,
-}: {
-  children: ReactNode;
-  initialSnapshot: Snapshot | null;
-  initialWorld: WorldStats | null;
-  initialLeaderboard: LeaderRow[] | null;
-}) {
-  const [snapshot, setSnapshot] = useState<Snapshot>(initialSnapshot ?? EMPTY_SNAPSHOT);
-  const [world, setWorld] = useState<WorldStats>(initialWorld ?? EMPTY_WORLD);
-  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>(initialLeaderboard ?? []);
+const INITIAL_STATE = createEmptyState();
+const INITIAL_SNAPSHOT = buildSnapshot(INITIAL_STATE);
+const INITIAL_WORLD = buildWorld(INITIAL_SNAPSHOT);
+
+export function GameProvider({ children }: { children: ReactNode }) {
+  const stateRef = useRef<LocalState>(INITIAL_STATE);
+  const [snapshot, setSnapshot] = useState<Snapshot>(INITIAL_SNAPSHOT);
+  const [world, setWorld] = useState<WorldStats>(INITIAL_WORLD);
+  const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [busy, setBusy] = useState(false);
   const toastId = useRef(1);
-  const prevLevel = useRef(initialSnapshot?.level.level ?? 1);
-  const prevBadges = useRef<Set<string>>(new Set(initialSnapshot?.badges ?? []));
+  const prevLevel = useRef(INITIAL_SNAPSHOT.level.level);
+  const prevBadges = useRef<Set<string>>(new Set());
 
   const push = useCallback((toast: Omit<Toast, "id">) => {
     const id = toastId.current++;
@@ -137,13 +121,31 @@ export function GameProvider({
     [push],
   );
 
+  const commit = useCallback((next: LocalState) => {
+    stateRef.current = next;
+    saveState(next);
+    const snap = buildSnapshot(next);
+    setSnapshot(snap);
+    setWorld(buildWorld(snap));
+    setLeaderboard(buildLeaderboard(snap));
+    return snap;
+  }, []);
+
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/me", { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    setSnapshot(data.snapshot);
-    setWorld(data.world);
-    setLeaderboard(data.leaderboard);
+    commit(loadState());
+  }, [commit]);
+
+  useEffect(() => {
+    const loaded = loadState();
+    queueMicrotask(() => {
+      stateRef.current = loaded;
+      const snap = buildSnapshot(loaded);
+      setSnapshot(snap);
+      setWorld(buildWorld(snap));
+      setLeaderboard(buildLeaderboard(snap));
+      prevLevel.current = snap.level.level;
+      prevBadges.current = new Set(snap.badges);
+    });
   }, []);
 
   const toggle = useCallback<Ctx["toggle"]>(
@@ -151,21 +153,15 @@ export function GameProvider({
       const before = snapshot;
       setBusy(true);
       try {
-        const res = await fetch("/api/progress", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepKey, action }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSnapshot(data.snapshot);
-          celebrate(data.snapshot, before.xp, new Set(before.badges));
-        }
+        const next = toggleStep(stateRef.current, stepKey, action);
+        if (!next) return;
+        const snap = commit(next);
+        celebrate(snap, before.xp, new Set(before.badges));
       } finally {
         setBusy(false);
       }
     },
-    [snapshot, celebrate],
+    [snapshot, commit, celebrate],
   );
 
   const runQuiz = useCallback<Ctx["runQuiz"]>(
@@ -173,106 +169,70 @@ export function GameProvider({
       const before = snapshot;
       setBusy(true);
       try {
-        const res = await fetch("/api/quiz", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ moduleKey, answers }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSnapshot(data.snapshot);
-          if (data.passed) {
-            push({
-              emoji: "✓",
-              title: `DIAGNOSTIC PASSED ${data.score}/${data.total}`,
-              body: "+25 xp written to db",
-              tone: "xp",
-            });
-          } else {
-            push({
-              emoji: "✗",
-              title: `DIAGNOSTIC ${data.score}/${data.total} — below 75%`,
-              body: "read the [fail] reasons, then re-run. no penalty, ever.",
-              tone: "info",
-            });
-          }
-          celebrate(data.snapshot, before.xp, new Set(before.badges));
-          return data.results as QuizResult[];
+        const result = submitQuiz(stateRef.current, moduleKey, answers);
+        if (!result) return null;
+        const snap = commit(result.state);
+        if (result.passed) {
+          push({
+            emoji: "✓",
+            title: `DIAGNOSTIC PASSED ${result.score}/${result.total}`,
+            body: "+25 xp saved locally",
+            tone: "xp",
+          });
+        } else {
+          push({
+            emoji: "✗",
+            title: `DIAGNOSTIC ${result.score}/${result.total} — below 75%`,
+            body: "read the [fail] reasons, then re-run. no penalty, ever.",
+            tone: "info",
+          });
         }
-        return null;
+        celebrate(snap, before.xp, new Set(before.badges));
+        return result.results;
       } finally {
         setBusy(false);
       }
     },
-    [snapshot, celebrate, push],
+    [snapshot, commit, celebrate, push],
   );
 
-  const saveProject = useCallback<Ctx["saveProject"]>(
+  const saveProjectAction = useCallback<Ctx["saveProject"]>(
     async (payload) => {
       const before = snapshot;
       setBusy(true);
       try {
-        const res = await fetch("/api/final-project", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSnapshot(data.snapshot);
-          celebrate(data.snapshot, before.xp, new Set(before.badges));
-          return data.selfScore as number;
-        }
-        return 0;
+        const result = saveProject(stateRef.current, payload);
+        const snap = commit(result.state);
+        celebrate(snap, before.xp, new Set(before.badges));
+        return result.selfScore;
       } finally {
         setBusy(false);
       }
     },
-    [snapshot, celebrate],
+    [snapshot, commit, celebrate],
   );
 
   const saveProfile = useCallback<Ctx["saveProfile"]>(
     async (payload) => {
       setBusy(true);
       try {
-        const res = await fetch("/api/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSnapshot(data.snapshot);
-          push({ emoji: "✓", title: "RECORD COMMITTED", body: "whoami updated", tone: "info" });
-        }
+        const next = updateProfile(stateRef.current, payload);
+        commit(next);
+        push({ emoji: "✓", title: "RECORD COMMITTED", body: "whoami updated", tone: "info" });
       } finally {
         setBusy(false);
       }
     },
-    [push],
+    [commit, push],
   );
 
   const resetAll = useCallback(async () => {
-    const res = await fetch("/api/reset", { method: "POST" });
-    const data = await res.json();
-    if (data.ok) {
-      setSnapshot(data.snapshot);
-      prevLevel.current = 1;
-      prevBadges.current = new Set();
-      push({ emoji: "↺", title: "HARD RESET COMPLETE", body: "back to level 1. the octoverse forgives everything.", tone: "info" });
-    }
-  }, [push]);
-
-  // A brand-new visitor has no player row yet: create one on first mount.
-  useEffect(() => {
-    if (!initialSnapshot) void refresh();
-  }, [initialSnapshot, refresh]);
-
-  useEffect(() => {
-    if (!initialSnapshot) return;
-    prevLevel.current = initialSnapshot.level.level;
-    prevBadges.current = new Set(initialSnapshot.badges);
-  }, [initialSnapshot]);
+    const next = resetProgress(stateRef.current);
+    commit(next);
+    prevLevel.current = 1;
+    prevBadges.current = new Set();
+    push({ emoji: "↺", title: "HARD RESET COMPLETE", body: "back to level 1. the octoverse forgives everything.", tone: "info" });
+  }, [commit, push]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -284,12 +244,12 @@ export function GameProvider({
       refresh,
       toggle,
       runQuiz,
-      saveProject,
+      saveProject: saveProjectAction,
       saveProfile,
       resetAll,
       dismiss,
     }),
-    [snapshot, world, leaderboard, toasts, busy, refresh, toggle, runQuiz, saveProject, saveProfile, resetAll, dismiss],
+    [snapshot, world, leaderboard, toasts, busy, refresh, toggle, runQuiz, saveProjectAction, saveProfile, resetAll, dismiss],
   );
 
   return (

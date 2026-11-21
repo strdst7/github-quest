@@ -7,6 +7,15 @@ import { useGame } from "@/components/GameProvider";
 import { Bar } from "@/components/ui";
 import { badgeCatalog, branding, modules } from "@/lib/course";
 import { PaletteDots } from "@/components/PaletteProvider";
+import { BASE_PATH } from "@/lib/site";
+
+function usePath() {
+  const pathname = usePathname();
+  if (BASE_PATH && pathname.startsWith(BASE_PATH)) {
+    return pathname.slice(BASE_PATH.length) || "/";
+  }
+  return pathname;
+}
 
 const tabs = [
   { href: "/", label: "overview", file: "README.md", emoji: "▸" },
@@ -52,7 +61,7 @@ function Readout({ compact = false }: { compact?: boolean }) {
 }
 
 function TabRow({ onNavigate, stacked }: { onNavigate?: () => void; stacked?: boolean }) {
-  const pathname = usePathname();
+  const pathname = usePath();
   return (
     <nav className={stacked ? "grid gap-1" : "flex flex-wrap items-center gap-1"}>
       {tabs.map((t) => {
@@ -77,7 +86,7 @@ function TabRow({ onNavigate, stacked }: { onNavigate?: () => void; stacked?: bo
 }
 
 function Tree({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
+  const pathname = usePath();
   const active = (href: string) => pathname === href;
 
   return (
@@ -195,7 +204,7 @@ export function SideRail() {
 
 export function TopBar() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePath();
   const current = tabs.find((t) => t.href === pathname);
 
   return (
@@ -297,8 +306,8 @@ export function Footer() {
           <p className="text-[10px] uppercase tracking-[0.16em] text-phos2">cat ./colophon</p>
           <p className="mt-2 leading-relaxed text-dim">
             Built for {branding.school}. Rendered on a simulated CRT: VT323 + IBM Plex Mono. Progress
-            is written to a traveller record in PostgreSQL, so you can kill the session mid-mission and
-            resume exactly where you left off.
+            is saved in this browser, so you can kill the session mid-mission and resume exactly where
+            you left off.
           </p>
           <Link
             href="/instructor"

@@ -30,8 +30,6 @@ import {
 } from "@/lib/course";
 import { allSteps } from "@/lib/game";
 
-export const dynamic = "force-dynamic";
-
 const bootLines = [
   { text: "[boot]  gitquest kernel 1.0 .................. ok", tone: "dim" as const },
   { text: "[boot]  mounting the octoverse ................. ok", tone: "dim" as const },
@@ -299,7 +297,7 @@ export default function HomePage() {
           number="02"
           kicker="the journey"
           title={<>eight levels, from <span className="text-cyan glow-cyan">“what is a repo?”</span> to “I shipped a thing”</>}
-          sub="Each level unlocks the next. Open one for the story beat, man pages, tasks, mission, patch and diagnostic — with progress written to the database as you go."
+          sub="Each level unlocks the next. Open one for the story beat, man pages, tasks, mission, patch and diagnostic — with progress saved in your browser as you go."
           accent="aqua"
         />
 

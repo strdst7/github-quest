@@ -91,7 +91,7 @@ export default function BadgesPage() {
                 <div className="mt-3 border-t border-dashed border-phos/18 pt-3">
                   {has ? (
                     <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.14em]" style={{ color }}>
-                      [x] written to db · src: {b.from}
+                      [x] saved locally · src: {b.from}
                     </p>
                   ) : (
                     <>

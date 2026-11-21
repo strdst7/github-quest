@@ -1,9 +1,9 @@
 import { ModuleView } from "@/components/ModuleView";
 import { modules } from "@/lib/course";
 
-export const dynamic = "force-dynamic";
+export const dynamicParams = false;
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
   return modules.map((m) => ({ moduleKey: m.key }));
 }
 

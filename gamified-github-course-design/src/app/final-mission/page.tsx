@@ -356,7 +356,7 @@ export default function FinalMissionPage() {
                 >
                   {flash === "launched"
                     ? "[ok] deployed. patch written, +100xp banked. now go tell somebody about it."
-                    : "[ok] draft saved to db. come back and finish when you're ready."}
+                    : "[ok] draft saved in this browser. come back and finish when you're ready."}
                   <span className="caret" />
                 </p>
               ) : null}
